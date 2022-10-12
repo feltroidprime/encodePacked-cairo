@@ -5,7 +5,7 @@
 
 > ## ⚠️ alpha version Code ! ⚠️
 >
-> Expect rapid iteration and support for little/big endian values, further gas optimisations and more documentation and examples. 
+> Expect rapid iteration and support for little/big endian values, automatic bit_length detection, further gas optimisations and more documentation and examples. 
 > 
 
 ## - Setup for development  
