@@ -1,0 +1,25 @@
+# IDE
+.vscode
+
+# Python
+__pycache__
+venv
+.idea
+
+# starknet 
+node.json
+*.deployments.txt
+artifacts
+
+# nile
+127.0.0.1.*
+
+# Protostar
+build
+ed25519/ed25519.py
+ed25519/sign.input
+ed25519/sign.py
+ed25519/checkparams.py
+
+build
+profile*
