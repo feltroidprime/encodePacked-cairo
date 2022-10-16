@@ -83,7 +83,7 @@ func test_packed2{
     assert x_i_bitlength[0] = 256;
     assert x_i_bitlength[1] = 256;
 
-    let res: Uint256* = encode_packed.encode_packed_u256_bits(x, x_len, x_i_bitlength);
+    let res: Uint256* = encode_packed.pack_u256_little(x, x_len, x_i_bitlength);
     %{ print_u256_array(ids.res.address_, 2) %}
     return ();
 }
@@ -112,7 +112,51 @@ func test_packed3{
     %{ print_u256_array(ids.x.address_, ids.x_len) %}
     %{ encode_packed_256(ids.x.address_, ids.x_len) %}
 
-    let res: Uint256* = encode_packed.encode_packed_u256_bits(x, x_len, x_i_bitlength);
+    let res: Uint256* = encode_packed.pack_u256_little(x, x_len, x_i_bitlength);
+    %{ print_u256_array(ids.res.address_, ids.x_len) %}
+    return ();
+}
+
+@external
+func test_bit_length{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, bitwise_ptr: BitwiseBuiltin*
+}() {
+    alloc_locals;
+
+    __setup__();
+
+    let b = encode_packed.get_felt_bitlength(1002);
+    assert b = 10;
+    return ();
+}
+
+@external
+func test_packed_auto{
+    syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, bitwise_ptr: BitwiseBuiltin*
+}() {
+    alloc_locals;
+
+    __setup__();
+    let (x: Uint256*) = alloc();
+    let x0 = Uint256(
+        161894476962632595678980058230621141717, 135594956203816336199041365895723851414
+    );  // 255 b
+    let x1 = Uint256(
+        158652469219077549203721308731996547375, 37029641659475623520754783739314053225
+    );  // 253 b
+    let x2 = Uint256(
+        288600309946081339912164709385528921233, 16924662596528861314676951345251986764
+    );  // 252 b
+
+    assert x[0] = x0;
+    assert x[1] = x1;
+    assert x[2] = x2;
+
+    let x_len = 3;
+    %{ print_u256_array(ids.x.address_, ids.x_len) %}
+    %{ encode_packed_256(ids.x.address_, ids.x_len) %}
+
+    let res: Uint256* = encode_packed.pack_u256_little_auto(x, x_len);
     %{ print_u256_array(ids.res.address_, ids.x_len) %}
     return ();
 }

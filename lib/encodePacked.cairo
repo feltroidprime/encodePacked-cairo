@@ -6,6 +6,8 @@ from starkware.cairo.common.uint256 import (
     uint256_add,
     uint256_pow2,
 )
+from starkware.cairo.common.cairo_builtins import BitwiseBuiltin
+
 from starkware.cairo.common.math import unsigned_div_rem as felt_divmod, split_felt
 from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.alloc import alloc
@@ -18,7 +20,28 @@ namespace encode_packed {
         alloc_locals;
         let (res: Uint256*) = alloc();
         let res_start = res;
-        encode_packed_u256_bits_loop(
+        encode_packed_u256_little_loop(
+            x=x,
+            x_len=x_len,
+            x_i_bitlength=x_i_bitlength,
+            index=0,
+            res=res_start,
+            shifted_bits_sum=0,
+            temp_next=x[1],
+        );
+        return res_start;
+    }
+    func pack_u256_little_auto{range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(
+        x: Uint256*, x_len: felt
+    ) -> Uint256* {
+        alloc_locals;
+        let (res: Uint256*) = alloc();
+        let res_start = res;
+        let (x_i_bitlength: felt*) = alloc();
+
+        get_u256_bitlength_loop(x, x_len, x_i_bitlength, 0);
+
+        encode_packed_u256_little_loop(
             x=x,
             x_len=x_len,
             x_i_bitlength=x_i_bitlength,
@@ -30,6 +53,53 @@ namespace encode_packed {
         return res_start;
     }
 
+    func get_felt_bitlength{range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(x: felt) -> felt {
+        alloc_locals;
+        local bit_length;
+        %{
+            x = ids.x
+            ids.bit_length = x.bit_length()
+        %}
+
+        let le = is_le(bit_length, 252);
+        assert le = 1;
+        assert bitwise_ptr[0].x = x;
+        let (n) = pow(2, bit_length);
+        assert bitwise_ptr[0].y = n - 1;
+        tempvar word = bitwise_ptr[0].x_and_y;
+        assert word = x;
+
+        assert bitwise_ptr[1].x = x;
+
+        let (n) = pow(2, bit_length - 1);
+
+        assert bitwise_ptr[1].y = n - 1;
+        tempvar word = bitwise_ptr[1].x_and_y;
+        assert word = x - n;
+
+        let bitwise_ptr = bitwise_ptr + 2 * BitwiseBuiltin.SIZE;
+        return bit_length;
+    }
+    func get_u256_bitlength{range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(x: Uint256) -> felt {
+        alloc_locals;
+        let b2 = get_felt_bitlength(x.high);
+        if (b2 != 0) {
+            return 128 + b2;
+        } else {
+            let b1 = get_felt_bitlength(x.low);
+            return b1 + b2;
+        }
+    }
+    func get_u256_bitlength_loop{range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(
+        x: Uint256*, x_len: felt, x_i_bitlength: felt*, index: felt
+    ) {
+        if (index == x_len) {
+            return ();
+        }
+        let b = get_u256_bitlength(x[index]);
+        assert x_i_bitlength[index] = b;
+        return get_u256_bitlength_loop(x, x_len, x_i_bitlength, index + 1);
+    }
     func cut_missing_bits_from_next_little{range_check_ptr}(
         n_bits: felt, x_next: Uint256, shifted_bits_sum: felt
     ) -> (left_bits: Uint256, right_bits: Uint256) {
@@ -66,14 +136,16 @@ namespace encode_packed {
             assert res[index] = temp_next;
             return res;
         }
+
         let bit_len = x_i_bitlength[index];
         let bit_len_next = x_i_bitlength[index + 1];
+        %{ print("Bitlen : ", ids.bit_len) %}
 
         if (is_le(bit_len_next, shifted_bits_sum + (256 - bit_len)) == 1) {
             // Not implemented / tested
             // Next word length is smalller than the number of bits to be shifted.*
             %{ print('Encode packed special case') %}
-            return encode_packed_u256_bits_loop(
+            return encode_packed_u256_little_loop(
                 x,
                 x_len,
                 x_i_bitlength,
@@ -96,7 +168,7 @@ namespace encode_packed {
 
             assert res[index] = m_low;
 
-            return encode_packed_u256_bits_loop(
+            return encode_packed_u256_little_loop(
                 x,
                 x_len,
                 x_i_bitlength,
@@ -109,7 +181,7 @@ namespace encode_packed {
         if (bit_len - shifted_bits_sum == 256) {
             %{ print('last case') %}
             assert res[index] = temp_next;
-            return encode_packed_u256_bits_loop(
+            return encode_packed_u256_little_loop(
                 x, x_len, x_i_bitlength, index + 1, res, shifted_bits_sum, x[index + 1]
             );
         }
